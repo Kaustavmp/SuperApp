@@ -1,0 +1,23 @@
+# SuperApp: Negative-Space & Contradiction Engine
+# Core
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.0
+pydantic-settings==2.5.0
+
+# LLM
+ollama==0.4.1
+
+# Vector Database
+chromadb==0.5.7
+
+# Graph
+networkx==3.3
+
+# Templating & Static Files
+jinja2==3.1.4
+aiofiles==24.1.0
+python-multipart==0.0.9
+
+# Utilities
+rich==13.8.0

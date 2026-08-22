@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}SuperApp — Upload & Analyze{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Hero Section -->
+    <div class="text-center py-8">
+        <h1 class="text-4xl font-bold mb-3">
+            Find What's <span class="bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">Missing</span>
+            & What <span class="bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">Contradicts</span>
+        </h1>
+        <p class="text-dark-400 max-w-2xl mx-auto">
+            Upload your documents and SuperApp will surface coverage gaps and silent contradictions
+            that traditional search cannot find.
+        </p>
+    </div>
+
+    <!-- Upload Card -->
+    <div class="max-w-2xl mx-auto">
+        <div class="bg-dark-800/60 border border-dark-700/50 rounded-2xl p-8 card-hover backdrop-blur-sm">
+            <h2 class="text-xl font-semibold mb-6 flex items-center space-x-2">
+                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <span>Upload Documents</span>
+            </h2>
+
+            <form id="uploadForm" enctype="multipart/form-data" class="space-y-6">
+                <!-- Drop Zone -->
+                <div id="dropZone" class="border-2 border-dashed border-dark-600 rounded-xl p-8 text-center hover:border-violet-500/50 transition-colors cursor-pointer">
+                    <svg class="w-12 h-12 text-dark-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <p class="text-dark-400 mb-1">Drag & drop files here, or <span class="text-violet-400 underline">browse</span></p>
+                    <p class="text-dark-500 text-sm">Supports .txt and .md files</p>
+                    <input type="file" id="fileInput" name="files" multiple accept=".txt,.md" class="hidden">
+                </div>
+
+                <!-- Selected Files List -->
+                <div id="fileList" class="hidden space-y-2"></div>
+
+                <!-- Domain Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-dark-300 mb-2">Analysis Domain</label>
+                    <select name="domain" id="domainSelect" class="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-2.5 text-gray-200 focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+                        <option value="open-source documentation">Open-Source Documentation</option>
+                        <option value="legal contracts">Legal Contracts</option>
+                        <option value="company policies">Company Policies</option>
+                        <option value="technical requirements">Technical Requirements</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="analyzeBtn" disabled
+                    class="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:from-dark-600 disabled:to-dark-600 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <span>Analyze Documents</span>
+                </button>
+            </form>
+
+            <!-- Progress Indicator -->
+            <div id="progressSection" class="hidden mt-6">
+                <div class="flex items-center space-x-3 mb-3">
+                    <div class="w-5 h-5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span id="progressText" class="text-dark-300">Processing...</span>
+                </div>
+                <div class="w-full bg-dark-700 rounded-full h-2">
+                    <div id="progressBar" class="bg-gradient-to-r from-violet-500 to-indigo-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Previous Analyses -->
+    {% if analyses %}
+    <div class="max-w-4xl mx-auto">
+        <h2 class="text-xl font-semibold mb-4">Previous Analyses</h2>
+        <div class="grid gap-4">
+            {% for a in analyses %}
+            <a href="/results/{{ a.id }}" class="block bg-dark-800/40 border border-dark-700/50 rounded-xl p-5 card-hover backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-sm font-medium text-dark-200">{{ a.domain }}</span>
+                        <p class="text-xs text-dark-500 mt-1">{{ a.doc_count }} documents • {{ a.finding_count }} findings</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        {% if a.status == 'completed' %}
+                        <span class="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">Completed</span>
+                        {% elif a.status == 'running' %}
+                        <span class="px-2.5 py-1 bg-amber-500/20 text-amber-400 rounded-full text-xs font-medium">Running</span>
+                        {% elif a.status == 'failed' %}
+                        <span class="px-2.5 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-medium">Failed</span>
+                        {% endif %}
+                        <svg class="w-5 h-5 text-dark-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const uploadForm = document.getElementById('uploadForm');
+    const progressSection = document.getElementById('progressSection');
+    const progressText = document.getElementById('progressText');
+    const progressBar = document.getElementById('progressBar');
+
+    let selectedFiles = [];
+
+    // Click to browse
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-violet-500/50', 'bg-dark-700/30');
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-violet-500/50', 'bg-dark-700/30');
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-violet-500/50', 'bg-dark-700/30');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    function handleFiles(files) {
+        selectedFiles = Array.from(files);
+        renderFileList();
+        analyzeBtn.disabled = selectedFiles.length === 0;
+    }
+
+    function renderFileList() {
+        if (selectedFiles.length === 0) {
+            fileList.classList.add('hidden');
+            return;
+        }
+        fileList.classList.remove('hidden');
+        fileList.innerHTML = selectedFiles.map((f, i) => `
+            <div class="flex items-center justify-between bg-dark-700/50 rounded-lg px-4 py-2.5">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="text-sm text-dark-200">${f.name}</span>
+                </div>
+                <span class="text-xs text-dark-500">${(f.size / 1024).toFixed(1)} KB</span>
+            </div>
+        `).join('');
+    }
+
+    // Form submission
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (selectedFiles.length === 0) return;
+
+        const domain = document.getElementById('domainSelect').value;
+
+        // Show progress
+        analyzeBtn.disabled = true;
+        progressSection.classList.remove('hidden');
+        progressText.textContent = 'Uploading documents...';
+        progressBar.style.width = '10%';
+
+        try {
+            // Step 1: Upload
+            const uploadData = new FormData();
+            selectedFiles.forEach(f => uploadData.append('files', f));
+            uploadData.append('domain', domain);
+
+            const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadData });
+            const uploadJson = await uploadRes.json();
+
+            if (!uploadRes.ok) throw new Error(uploadJson.detail || 'Upload failed');
+
+            progressText.textContent = 'Running analysis pipeline (this may take a few minutes)...';
+            progressBar.style.width = '30%';
+
+            // Step 2: Analyze
+            const analyzeData = new FormData();
+            analyzeData.append('session_id', uploadJson.session_id);
+            analyzeData.append('domain', domain);
+
+            const analyzeRes = await fetch('/api/analyze', { method: 'POST', body: analyzeData });
+            const analyzeJson = await analyzeRes.json();
+
+            if (!analyzeRes.ok) throw new Error(analyzeJson.detail || 'Analysis failed');
+
+            progressText.textContent = 'Analysis complete! Redirecting...';
+            progressBar.style.width = '100%';
+
+            setTimeout(() => {
+                window.location.href = `/results/${analyzeJson.analysis_id}`;
+            }, 1000);
+
+        } catch (err) {
+            progressText.textContent = `Error: ${err.message}`;
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('from-violet-500', 'to-indigo-500');
+            progressBar.classList.add('from-red-500', 'to-red-600');
+            analyzeBtn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}
