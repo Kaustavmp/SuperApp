@@ -20,6 +20,7 @@ ENV/
 chroma_db/
 uploads/
 outputs/
+evaluation_data/
 
 # OS & Logs
 .DS_Store
