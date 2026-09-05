@@ -72,7 +72,7 @@ class SchemaInducer:
         Merges results if multiple documents are processed.
         """
         if not documents:
-            return CoverageSchema(items=[])
+            return CoverageSchema(domain=domain, items=[])
 
         # Sample up to 5 documents to avoid massive prompt token usage
         sample_docs = documents[:5]
@@ -88,11 +88,11 @@ class SchemaInducer:
 
         if len(sample_docs) == 1:
             items = self._parse_schema_items(all_schemas_json[0])
-            return CoverageSchema(items=items)
+            return CoverageSchema(domain=domain, items=items)
 
         # Merge step
         merge_user_prompt = SCHEMA_MERGE_PROMPT.format(schemas=json.dumps(all_schemas_json))
         merged_json = await self._call_llm(SCHEMA_INDUCTION_SYSTEM_PROMPT, merge_user_prompt)
         merged_items = self._parse_schema_items(merged_json)
 
-        return CoverageSchema(items=merged_items)
+        return CoverageSchema(domain=domain, items=merged_items)

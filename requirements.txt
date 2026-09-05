@@ -1,23 +1,44 @@
-# SuperApp: Negative-Space & Contradiction Engine
-# Core
+# ============================================================
+# SuperApp -- Python Dependencies
+# ============================================================
+
+# --- Core Web Framework ---
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.0
 pydantic-settings==2.5.0
 
-# LLM
+# --- LLM Providers ---
+# Local (Ollama) -- default for development
 ollama==0.4.1
+# Cloud providers -- install whichever you use
+anthropic>=0.40.0
+openai>=1.50.0
 
-# Vector Database
-chromadb==0.5.7
+# --- Embeddings & Vector Store ---
+# ChromaDB is optional in the MVP because the hnswlib wheel can fail to build on some Windows environments.
+# Install it manually on supported machines when the vector store is required.
+chromadb==0.5.7; platform_system != "Windows" and python_version < "3.13"
 
-# Graph
+# --- Graph ---
 networkx==3.3
 
-# Templating & Static Files
+# --- Database (SQLite MVP -> Postgres Phase 2) ---
+sqlalchemy==2.0.35
+aiosqlite==0.20.0
+alembic==1.13.3
+
+# --- Document Parsing ---
+python-docx==1.1.2
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# --- Templating & Static Files ---
 jinja2==3.1.4
 aiofiles==24.1.0
 python-multipart==0.0.9
 
-# Utilities
+# --- Utilities ---
 rich==13.8.0
+httpx==0.27.2
+python-dateutil==2.9.0

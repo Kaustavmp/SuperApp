@@ -56,20 +56,20 @@ class CoverageDiffer:
                 status = CoverageStatus.MISSING
                 
             return CoverageResult(
-                item_id=item.id,
+                schema_item=item,
                 status=status,
                 confidence=float(data.get("confidence", 0.0)),
                 reasoning=str(data.get("reasoning", "Failed to parse reasoning.")),
-                evidence=data.get("evidence", [])
+                evidence_chunks=data.get("evidence", [])
             )
         except Exception as e:
             # Handle malformed response or API error
             return CoverageResult(
-                item_id=item.id,
+                schema_item=item,
                 status=CoverageStatus.MISSING,
                 confidence=0.0,
                 reasoning=f"Error analyzing coverage: {str(e)}",
-                evidence=[]
+                evidence_chunks=[]
             )
 
     async def diff_coverage(

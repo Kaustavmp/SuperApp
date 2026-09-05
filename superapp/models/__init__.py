@@ -10,10 +10,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# ---------------------------------------------------------------------------
-# Document & Chunk Models
-# ---------------------------------------------------------------------------
-
 class Document(BaseModel):
     """A source document loaded into the system."""
 
@@ -22,6 +18,42 @@ class Document(BaseModel):
     content: str
     metadata: dict = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DocumentVersion(BaseModel):
+    """Represents a document revision in a version chain."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    document_id: str
+    version_label: str = "v1"
+    source_connector: str = "upload"
+    doc_type: str = "document"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: dict = Field(default_factory=dict)
+
+
+class Organization(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: dict = Field(default_factory=dict)
+
+
+class Workspace(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    organization_id: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: dict = Field(default_factory=dict)
+
+
+class Project(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    workspace_id: str
+    vertical: str = "codebase_docs"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: dict = Field(default_factory=dict)
 
 
 class Chunk(BaseModel):
@@ -36,10 +68,6 @@ class Chunk(BaseModel):
     metadata: dict = Field(default_factory=dict)
 
 
-# ---------------------------------------------------------------------------
-# Schema Induction Models
-# ---------------------------------------------------------------------------
-
 class SchemaItem(BaseModel):
     """A single expected topic/section in the induced coverage schema."""
 
@@ -47,7 +75,8 @@ class SchemaItem(BaseModel):
     category: str
     topic: str
     description: str
-    importance: str = "medium"  # low, medium, high, critical
+    importance: str = "medium"
+    examples: list[str] = Field(default_factory=list)
 
 
 class CoverageSchema(BaseModel):
@@ -56,12 +85,9 @@ class CoverageSchema(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     domain: str
     items: list[SchemaItem] = Field(default_factory=list)
+    status: str = "draft"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-
-# ---------------------------------------------------------------------------
-# Coverage Diffing Models
-# ---------------------------------------------------------------------------
 
 class CoverageStatus(str, Enum):
     """Whether a schema item is covered in the corpus."""
@@ -81,10 +107,6 @@ class CoverageResult(BaseModel):
     evidence_chunks: list[str] = Field(default_factory=list)
 
 
-# ---------------------------------------------------------------------------
-# Atomic Claim & Contradiction Models
-# ---------------------------------------------------------------------------
-
 class AtomicClaim(BaseModel):
     """A discrete, self-contained factual or policy claim extracted from a chunk."""
 
@@ -93,6 +115,9 @@ class AtomicClaim(BaseModel):
     source_document_id: str
     source_chunk_id: str
     source_filename: str = ""
+    source_span: Optional[dict] = None
+    doc_version: str = ""
+    doc_date: Optional[str] = None
     metadata: dict = Field(default_factory=dict)
 
 
@@ -103,6 +128,26 @@ class RelationType(str, Enum):
     CONTRADICTS = "contradicts"
     SILENT_ON = "silent_on"
     UNRELATED = "unrelated"
+    SUPERSEDED = "superseded"
+
+
+class ClaimNode(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    claim_id: str
+    text: str
+    document_id: str = ""
+    reasoning_trace: str = ""
+    metadata: dict = Field(default_factory=dict)
+
+
+class ClaimEdge(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    claim_a_id: str
+    claim_b_id: str
+    relation: RelationType
+    confidence: float = Field(ge=0.0, le=1.0)
+    reasoning: str = ""
+    metadata: dict = Field(default_factory=dict)
 
 
 class ClaimRelation(BaseModel):
@@ -113,11 +158,8 @@ class ClaimRelation(BaseModel):
     relation: RelationType
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str
+    metadata: dict = Field(default_factory=dict)
 
-
-# ---------------------------------------------------------------------------
-# Finding Models (unified output)
-# ---------------------------------------------------------------------------
 
 class FindingType(str, Enum):
     """The type of finding surfaced by SuperApp."""
@@ -135,6 +177,12 @@ class Severity(str, Enum):
     CRITICAL = "critical"
 
 
+class FindingStatus(str, Enum):
+    OPEN = "open"
+    ACCEPTED = "accepted"
+    DISMISSED = "dismissed"
+
+
 class Finding(BaseModel):
     """A single gap or contradiction finding with full reasoning trace."""
 
@@ -146,12 +194,9 @@ class Finding(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning_trace: str
     source_references: list[str] = Field(default_factory=list)
+    status: FindingStatus = FindingStatus.OPEN
     metadata: dict = Field(default_factory=dict)
 
-
-# ---------------------------------------------------------------------------
-# Analysis Result (top-level container)
-# ---------------------------------------------------------------------------
 
 class AnalysisStatus(str, Enum):
     """Status of an analysis run."""
@@ -162,12 +207,22 @@ class AnalysisStatus(str, Enum):
     FAILED = "failed"
 
 
+class VerticalConfig(BaseModel):
+    name: str
+    display_name: str
+    description: str = ""
+    schema_library_path: str = ""
+    scoring_rubric: dict = Field(default_factory=dict)
+    ui_metadata: dict = Field(default_factory=dict)
+
+
 class AnalysisResult(BaseModel):
     """Complete output of a SuperApp analysis run."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: AnalysisStatus = AnalysisStatus.PENDING
     domain: str = ""
+    vertical: str = "codebase_docs"
     documents: list[Document] = Field(default_factory=list)
     coverage_schema: Optional[CoverageSchema] = None
     coverage_results: list[CoverageResult] = Field(default_factory=list)

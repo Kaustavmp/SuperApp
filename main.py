@@ -1,5 +1,3 @@
-"""FastAPI application entry point for SuperApp."""
-
 import os
 from contextlib import asynccontextmanager
 
@@ -13,28 +11,30 @@ from superapp.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    # Verify Ollama connection on startup
-    import ollama
-
+    provider_name = settings.llm_provider
     try:
-        client = ollama.Client(host=settings.ollama_host)
-        client.list()
-        print(f"✅ Connected to Ollama at {settings.ollama_host}")
+        if provider_name == "ollama":
+            import ollama
+
+            client = ollama.Client(host=settings.ollama_host)
+            client.list()
+            print(f"✅ Connected to Ollama at {settings.ollama_host}")
+        else:
+            print(f"✅ LLM provider configured: {provider_name}")
     except Exception as e:
-        print(f"⚠️  Could not connect to Ollama at {settings.ollama_host}: {e}")
-        print("   Make sure Ollama is running: ollama serve")
+        label = "Ollama" if provider_name == "ollama" else provider_name.title()
+        print(f"⚠️  Could not connect to {label}: {e}")
 
     yield
 
 
 app = FastAPI(
     title="SuperApp",
-    description="The Negative-Space & Contradiction Engine",
+    description="SuperApp - Document analysis, coverage gaps, and contradiction detection platform",
     version="1.0.0",
     lifespan=lifespan,
 )
 
-# Mount static files and templates
 base_dir = os.path.dirname(os.path.abspath(__file__))
 dashboard_dir = os.path.join(base_dir, "dashboard")
 
@@ -46,7 +46,6 @@ app.mount(
 
 templates = Jinja2Templates(directory=os.path.join(dashboard_dir, "templates"))
 
-# Import and include API routes
 from superapp.api.routes import router as api_router  # noqa: E402
 from superapp.api.routes import ui_router  # noqa: E402
 
@@ -57,4 +56,4 @@ app.include_router(ui_router, tags=["ui"])
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host=settings.host, port=settings.port, reload=True)
+    uvicorn.run("main:app", host=settings.host, port=settings.port, reload=settings.debug)

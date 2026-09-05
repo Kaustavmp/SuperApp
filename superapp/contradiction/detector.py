@@ -1,7 +1,7 @@
 import json
 import uuid
 import ollama
-from typing import List, Set, FrozenSet
+from typing import List, Set, FrozenSet, Optional
 
 from superapp.config import settings
 from superapp.models import AtomicClaim, ClaimRelation, RelationType
@@ -15,7 +15,8 @@ class ContradictionDetector:
     async def detect_contradictions(self, claims: List[AtomicClaim]) -> List[ClaimRelation]:
         # 1. Add all claims to vector store
         # Assuming vector_store has a method like add_claims
-        await self.vector_store.add_claims(claims)
+        # VectorStore methods are synchronous; call directly
+        self.vector_store.add_claims(claims)
         
         checked_pairs: Set[FrozenSet[str]] = set()
         relations: List[ClaimRelation] = []
@@ -23,7 +24,7 @@ class ContradictionDetector:
         # 2. For each claim, find similar claims via vector store
         for claim in claims:
             # candidate pruning (similarity threshold conceptually handled by vector store)
-            similar_claims = await self.vector_store.find_similar_claims(claim, k=5) 
+            similar_claims = self.vector_store.find_similar_claims(claim, n_results=5)
             
             for candidate in similar_claims:
                 if claim.id == candidate.id:
@@ -42,7 +43,7 @@ class ContradictionDetector:
                     
         return relations
         
-    async def _check_pair(self, claim_a: AtomicClaim, claim_b: AtomicClaim) -> ClaimRelation:
+    async def _check_pair(self, claim_a: AtomicClaim, claim_b: AtomicClaim) -> Optional[ClaimRelation]:
         messages = [
             {"role": "system", "content": CONTRADICTION_CHECK_SYSTEM_PROMPT},
             {"role": "user", "content": CONTRADICTION_CHECK_USER_PROMPT.format(
@@ -72,12 +73,11 @@ class ContradictionDetector:
             }
             
             rel_type = rel_map.get(rel_str, RelationType.UNRELATED)
-            
-            # Create relation object
+
+            # Create relation object following models.ClaimRelation schema
             return ClaimRelation(
-                id=str(uuid.uuid4()),
-                source_claim_id=claim_a.id,
-                target_claim_id=claim_b.id,
+                claim_a_id=claim_a.id,
+                claim_b_id=claim_b.id,
                 relation=rel_type,
                 confidence=float(confidence),
                 reasoning=reasoning
