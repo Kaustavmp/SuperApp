@@ -1,6 +1,7 @@
 """Coverage Differ implementation."""
 
 import json
+import asyncio
 from typing import List, Any
 import ollama
 
@@ -24,12 +25,13 @@ class CoverageDiffer:
     def __init__(self) -> None:
         """Initialize the differ with the Ollama client."""
         self.client = ollama.AsyncClient(host=settings.ollama_host)
-        self.model = settings.ollama_reasoning_model
+        self.model = settings.get_model_for_stage("coverage_diff")
 
     async def _check_single_item(self, item: SchemaItem, content: str) -> CoverageResult:
         """Check a single schema item against the content."""
+        topic_name = getattr(item, "topic", getattr(item, "name", "General Topic"))
         prompt = COVERAGE_CHECK_USER_PROMPT.format(
-            schema_topic=item.name,
+            schema_topic=topic_name,
             schema_description=item.description or "No description provided.",
             document_content=content
         )
@@ -88,10 +90,13 @@ class CoverageDiffer:
         
         full_content = "\n\n".join(content_parts)
         
-        results = []
-        for item in schema.items:
-            result = await self._check_single_item(item, full_content)
-            results.append(result)
+        semaphore = asyncio.Semaphore(max(1, settings.max_concurrent_llm_calls))
+
+        async def check(item: SchemaItem) -> CoverageResult:
+            async with semaphore:
+                return await self._check_single_item(item, full_content)
+
+        results = list(await asyncio.gather(*(check(item) for item in schema.items)))
             
         # Sort results: Missing first, then Partially Covered, then Covered.
         # Secondary sort by confidence (ascending - least confident first)

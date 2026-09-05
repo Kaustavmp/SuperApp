@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: superapp
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: AUTH_PROVIDER
+        value: none
+      - key: DATABASE_URL
+        fromDatabase:
+          name: superapp-db
+          property: connectionString
+      - key: LLM_PROVIDER
+        value: ollama
+
+databases:
+  - name: superapp-db
+    plan: starter

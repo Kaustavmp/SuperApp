@@ -1,0 +1,9 @@
+{
+  "items": [
+    {"category": "risk", "topic": "Indemnification", "description": "Allocation of third-party and direct-loss indemnity obligations.", "importance": "high"},
+    {"category": "term", "topic": "Termination", "description": "Termination rights, notice periods, and post-termination duties.", "importance": "high"},
+    {"category": "risk", "topic": "Liability", "description": "Liability caps, exclusions, and consequential damages.", "importance": "critical"},
+    {"category": "governance", "topic": "Governing Law", "description": "Applicable law, venue, and dispute resolution.", "importance": "medium"},
+    {"category": "assurance", "topic": "Warranties", "description": "Representations, warranties, disclaimers, and remedies.", "importance": "high"}
+  ]
+}

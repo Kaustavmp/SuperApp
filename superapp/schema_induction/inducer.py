@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from typing import List
 
 import ollama
@@ -11,6 +12,7 @@ from superapp.schema_induction.prompts import (
     SCHEMA_INDUCTION_USER_PROMPT,
     SCHEMA_MERGE_PROMPT
 )
+from superapp.verticals import get_vertical
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,15 @@ class SchemaInducer:
     """
     def __init__(self):
         self.client = ollama.AsyncClient(host=settings.ollama_host)
-        self.model = settings.ollama_reasoning_model
+        self.model = settings.get_model_for_stage("schema_induction")
+
+    def _load_seed_items(self, vertical: str) -> List[SchemaItem]:
+        try:
+            path = Path(get_vertical(vertical).schema_library_path) / "seed_schema.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return [SchemaItem(**item) for item in data.get("items", data)]
+        except (KeyError, OSError, json.JSONDecodeError, TypeError, ValueError):
+            return []
 
     async def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
         """Helper to call Ollama chat with JSON format."""
@@ -71,8 +81,9 @@ class SchemaInducer:
         Induces a schema by prompting the LLM on a sample of the documents.
         Merges results if multiple documents are processed.
         """
+        seed_items = self._load_seed_items(domain)
         if not documents:
-            return CoverageSchema(domain=domain, items=[])
+            return CoverageSchema(domain=domain, items=seed_items)
 
         # Sample up to 5 documents to avoid massive prompt token usage
         sample_docs = documents[:5]
@@ -88,11 +99,18 @@ class SchemaInducer:
 
         if len(sample_docs) == 1:
             items = self._parse_schema_items(all_schemas_json[0])
-            return CoverageSchema(domain=domain, items=items)
+            return CoverageSchema(domain=domain, items=self._merge_seed_items(seed_items, items))
 
         # Merge step
         merge_user_prompt = SCHEMA_MERGE_PROMPT.format(schemas=json.dumps(all_schemas_json))
         merged_json = await self._call_llm(SCHEMA_INDUCTION_SYSTEM_PROMPT, merge_user_prompt)
         merged_items = self._parse_schema_items(merged_json)
 
-        return CoverageSchema(domain=domain, items=merged_items)
+        return CoverageSchema(domain=domain, items=self._merge_seed_items(seed_items, merged_items))
+
+    @staticmethod
+    def _merge_seed_items(seed_items: List[SchemaItem], induced_items: List[SchemaItem]) -> List[SchemaItem]:
+        items = list(seed_items)
+        topics = {item.topic.casefold() for item in items}
+        items.extend(item for item in induced_items if item.topic.casefold() not in topics)
+        return items

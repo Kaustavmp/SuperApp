@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     chunk_size: int = 1000
     chunk_overlap: int = 200
+    max_concurrent_llm_calls: int = 4
 
     min_confidence_threshold: float = 0.3
     contradiction_similarity_threshold: float = 0.5
@@ -47,13 +48,27 @@ class Settings(BaseSettings):
 
     max_tokens_per_job: int = 500000
     max_cost_per_job_usd: float = 0.0
+    input_cost_per_million_tokens: float = 0.0
+    output_cost_per_million_tokens: float = 0.0
 
     auth_provider: str = "none"
+    api_key: str = ""
+    default_role: str = "admin"
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = True
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    def get_model_for_stage(self, stage: str) -> str:
+        """Resolve a cascade stage to the configured provider-specific model."""
+        tier = getattr(self, f"cascade_{stage}", self.default_model_tier)
+        return getattr(self, f"{self.llm_provider}_{tier}_model")
+
+    def get_model_for_stage(self, stage: str) -> str:
+        """Resolve a cascade stage to the configured provider-specific model."""
+        tier = getattr(self, f"cascade_{stage}", self.default_model_tier)
+        return getattr(self, f"{self.llm_provider}_{tier}_model")
 
 
 settings = Settings()

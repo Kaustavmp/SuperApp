@@ -18,9 +18,11 @@ class ContradictionGraphBuilder:
             
         for relation in relations:
             relation_val = relation.relation.value if isinstance(relation.relation, RelationType) else relation.relation
+            claim_a = getattr(relation, "claim_a_id", getattr(relation, "source_claim_id", None))
+            claim_b = getattr(relation, "claim_b_id", getattr(relation, "target_claim_id", None))
             self.graph.add_edge(
-                relation.source_claim_id,
-                relation.target_claim_id,
+                claim_a,
+                claim_b,
                 relation_type=relation_val,
                 confidence=relation.confidence,
                 reasoning=relation.reasoning

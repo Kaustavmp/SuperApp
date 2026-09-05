@@ -7,13 +7,15 @@ from typing import Any
 
 from superapp.config import settings
 from superapp.models import AnalysisResult, AnalysisStatus, Document
+from superapp.platform.billing import BillingTracker
 
 
 class AnalysisOrchestrator:
     """Minimal orchestrator that preserves the existing pipeline while enabling future expansion."""
 
-    def __init__(self, analysis_id: str | None = None):
+    def __init__(self, analysis_id: str | None = None, billing: BillingTracker | None = None):
         self.analysis_id = analysis_id
+        self.billing = billing or BillingTracker()
 
     async def run_full_analysis(self, documents: list[Document], *, domain: str = "", vertical: str = "codebase_docs") -> AnalysisResult:
         analysis = AnalysisResult(
@@ -24,6 +26,7 @@ class AnalysisOrchestrator:
             documents=documents,
             created_at=datetime.utcnow(),
         )
+        self.billing.add_usage(documents_processed=len(documents))
 
         try:
             from superapp.ingestion.chunker import DocumentChunker
@@ -41,6 +44,7 @@ class AnalysisOrchestrator:
                 all_chunks.extend(chunker.chunk_document(document))
 
             schema = await SchemaInducer().induce_schema(documents, domain)
+            self.billing.add_usage(tokens_consumed=sum(len(d.content) for d in documents) // 4)
             analysis.coverage_schema = schema
 
             differ = CoverageDiffer()
@@ -58,6 +62,16 @@ class AnalysisOrchestrator:
 
             scorer = Scorer()
             analysis.findings = scorer.generate_findings(analysis.coverage_results, analysis.relations, analysis.claims)
+            analysis.findings = [
+                finding for finding in analysis.findings
+                if finding.confidence >= settings.min_confidence_threshold
+            ]
+            usage = self.billing.snapshot()
+            analysis.metadata = {
+                "token_usage": usage,
+                "total_tokens": usage["total_tokens"],
+                "estimated_cost_usd": usage["estimated_cost_usd"],
+            }
 
             analysis.status = AnalysisStatus.COMPLETED
             analysis.completed_at = datetime.utcnow()

@@ -1,6 +1,7 @@
 import json
 import uuid
 import ollama
+import asyncio
 from typing import List, Set, FrozenSet, Optional
 
 from superapp.config import settings
@@ -19,7 +20,7 @@ class ContradictionDetector:
         self.vector_store.add_claims(claims)
         
         checked_pairs: Set[FrozenSet[str]] = set()
-        relations: List[ClaimRelation] = []
+        candidate_pairs: List[tuple[AtomicClaim, AtomicClaim]] = []
         
         # 2. For each claim, find similar claims via vector store
         for claim in claims:
@@ -36,12 +37,16 @@ class ContradictionDetector:
                     
                 checked_pairs.add(pair)
                 
-                # 3. Call LLM to check for contradiction
-                relation = await self._check_pair(claim, candidate)
-                if relation:
-                    relations.append(relation)
-                    
-        return relations
+                candidate_pairs.append((claim, candidate))
+
+        semaphore = asyncio.Semaphore(max(1, settings.max_concurrent_llm_calls))
+
+        async def check(pair: tuple[AtomicClaim, AtomicClaim]) -> Optional[ClaimRelation]:
+            async with semaphore:
+                return await self._check_pair(*pair)
+
+        checked = await asyncio.gather(*(check(pair) for pair in candidate_pairs))
+        return [relation for relation in checked if relation]
         
     async def _check_pair(self, claim_a: AtomicClaim, claim_b: AtomicClaim) -> Optional[ClaimRelation]:
         messages = [
@@ -53,7 +58,7 @@ class ContradictionDetector:
         ]
         
         response = await self.client.chat(
-            model=settings.ollama_reasoning_model,
+            model=settings.get_model_for_stage("contradiction_classification"),
             messages=messages,
             format="json"
         )

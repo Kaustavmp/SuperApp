@@ -78,6 +78,11 @@ class SchemaItem(BaseModel):
     importance: str = "medium"
     examples: list[str] = Field(default_factory=list)
 
+    @property
+    def name(self) -> str:
+        """Backward-compatible alias for topic."""
+        return self.topic
+
 
 class CoverageSchema(BaseModel):
     """The full induced taxonomy of what a document should cover."""
@@ -160,6 +165,16 @@ class ClaimRelation(BaseModel):
     reasoning: str
     metadata: dict = Field(default_factory=dict)
 
+    @property
+    def source_claim_id(self) -> str:
+        """Backward-compatible alias for claim_a_id."""
+        return self.claim_a_id
+
+    @property
+    def target_claim_id(self) -> str:
+        """Backward-compatible alias for claim_b_id."""
+        return self.claim_b_id
+
 
 class FindingType(str, Enum):
     """The type of finding surfaced by SuperApp."""
@@ -232,3 +247,14 @@ class AnalysisResult(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
+    metadata: dict = Field(default_factory=dict)
+
+    @property
+    def token_usage(self) -> dict:
+        """Return normalized token usage for API and dashboard consumers."""
+        return self.metadata.get("token_usage", {})
+
+    @property
+    def cost_estimate(self) -> float:
+        """Return the estimated USD cost of this analysis."""
+        return float(self.metadata.get("estimated_cost_usd", 0.0))

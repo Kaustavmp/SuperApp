@@ -21,9 +21,16 @@ async def lifespan(app: FastAPI):
             print(f"✅ Connected to Ollama at {settings.ollama_host}")
         else:
             print(f"✅ LLM provider configured: {provider_name}")
-    except Exception as e:
-        label = "Ollama" if provider_name == "ollama" else provider_name.title()
-        print(f"⚠️  Could not connect to {label}: {e}")
+    except Exception as exc:
+        print(f"⚠️  LLM provider unavailable at startup: {exc}")
+
+    # Initialize persistent DB tables (SQLite / Postgres)
+    try:
+        from superapp.db import init_db
+        init_db()
+        print("✅ Database initialized successfully.")
+    except Exception as exc:
+        print(f"⚠️  Could not initialize database: {exc}")
 
     yield
 

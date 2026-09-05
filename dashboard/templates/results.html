@@ -30,7 +30,7 @@
     </div>
 
     <!-- Summary Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div class="bg-dark-800/60 border border-dark-700/50 rounded-xl p-5 backdrop-blur-sm">
             <p class="text-dark-400 text-sm">Total Findings</p>
             <p class="text-3xl font-bold mt-1">{{ total_findings }}</p>
@@ -47,6 +47,23 @@
             <p class="text-dark-400 text-sm">Avg Confidence</p>
             <p class="text-3xl font-bold mt-1 text-violet-400">{{ "%.0f"|format(avg_confidence * 100) }}%</p>
         </div>
+        <div class="bg-dark-800/60 border border-dark-700/50 rounded-xl p-5 backdrop-blur-sm">
+            <p class="text-dark-400 text-sm">Usage / Cost</p>
+            <p class="text-lg font-bold mt-2">{{ analysis.metadata.get('total_tokens', 0) }} tokens</p>
+            <p class="text-xs text-dark-400">${{ "%.4f"|format(analysis.metadata.get('estimated_cost_usd', 0.0)) }}</p>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3" id="findingFilters">
+        <label class="text-sm text-dark-400">Status
+            <select data-filter="status" class="ml-2 bg-dark-800 border border-dark-700 rounded px-2 py-1 text-sm"><option value="all">All</option><option value="open">Open</option><option value="accepted">Accepted</option><option value="dismissed">Dismissed</option></select>
+        </label>
+        <label class="text-sm text-dark-400">Severity
+            <select data-filter="severity" class="ml-2 bg-dark-800 border border-dark-700 rounded px-2 py-1 text-sm"><option value="all">All</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        </label>
+        <label class="text-sm text-dark-400">Type
+            <select data-filter="type" class="ml-2 bg-dark-800 border border-dark-700 rounded px-2 py-1 text-sm"><option value="all">All</option><option value="coverage_gap">Gaps</option><option value="contradiction">Contradictions</option></select>
+        </label>
     </div>
 
     <!-- Tabs -->
@@ -71,7 +88,7 @@
     <div id="panel-gaps" class="tab-panel space-y-4">
         {% if gaps %}
         {% for gap in gaps %}
-        <div class="bg-dark-800/60 border border-dark-700/50 rounded-xl p-6 card-hover backdrop-blur-sm">
+        <div class="finding-card bg-dark-800/60 border border-dark-700/50 rounded-xl p-6 card-hover backdrop-blur-sm" data-status="{{ gap.status.value }}" data-severity="{{ gap.severity.value }}" data-type="coverage_gap">
             <div class="flex items-start justify-between mb-3">
                 <div class="flex items-center space-x-3">
                     <div class="w-2 h-2 rounded-full
@@ -93,9 +110,11 @@
                     <span class="px-2 py-0.5 bg-dark-700 rounded text-xs text-dark-300">
                         {{ "%.0f"|format(gap.confidence * 100) }}% confidence
                     </span>
+                    <span class="status-pill px-2 py-0.5 rounded text-xs bg-dark-700 text-dark-300">{{ gap.status.value }}</span>
                 </div>
             </div>
             <p class="text-dark-300 text-sm mb-4">{{ gap.description }}</p>
+            <div class="flex gap-2 mb-3"><button onclick="setFindingStatus('{{ gap.id }}', 'accepted', this)" class="text-xs text-emerald-400">Accept</button><button onclick="setFindingStatus('{{ gap.id }}', 'dismissed', this)" class="text-xs text-red-400">Dismiss</button></div>
 
             <!-- Expandable Reasoning Trace -->
             <button onclick="toggleReasoning(this)" class="text-xs text-violet-400 hover:text-violet-300 flex items-center space-x-1">
@@ -121,7 +140,7 @@
     <div id="panel-contradictions" class="tab-panel hidden space-y-4">
         {% if contradictions %}
         {% for c in contradictions %}
-        <div class="bg-dark-800/60 border border-dark-700/50 rounded-xl p-6 card-hover backdrop-blur-sm">
+        <div class="finding-card bg-dark-800/60 border border-dark-700/50 rounded-xl p-6 card-hover backdrop-blur-sm" data-status="{{ c.status.value }}" data-severity="{{ c.severity.value }}" data-type="contradiction">
             <div class="flex items-start justify-between mb-3">
                 <div class="flex items-center space-x-3">
                     <div class="w-2 h-2 rounded-full
@@ -143,9 +162,11 @@
                     <span class="px-2 py-0.5 bg-dark-700 rounded text-xs text-dark-300">
                         {{ "%.0f"|format(c.confidence * 100) }}% confidence
                     </span>
+                    <span class="status-pill px-2 py-0.5 rounded text-xs bg-dark-700 text-dark-300">{{ c.status.value }}</span>
                 </div>
             </div>
             <p class="text-dark-300 text-sm mb-4">{{ c.description }}</p>
+            <div class="flex gap-2 mb-3"><button onclick="setFindingStatus('{{ c.id }}', 'accepted', this)" class="text-xs text-emerald-400">Accept</button><button onclick="setFindingStatus('{{ c.id }}', 'dismissed', this)" class="text-xs text-red-400">Dismiss</button></div>
 
             {% if c.source_references %}
             <div class="flex flex-wrap gap-2 mb-3">
@@ -220,6 +241,26 @@
         const arrow = btn.querySelector('.reasoning-arrow');
         trace.classList.toggle('open');
         arrow.style.transform = trace.classList.contains('open') ? 'rotate(90deg)' : 'rotate(0)';
+    }
+
+    function applyFindingFilters() {
+        const filters = Object.fromEntries([...document.querySelectorAll('#findingFilters select')].map(select => [select.dataset.filter, select.value]));
+        document.querySelectorAll('.finding-card').forEach(card => {
+            const visible = Object.entries(filters).every(([key, value]) => value === 'all' || card.dataset[key] === value);
+            card.classList.toggle('hidden', !visible);
+        });
+    }
+
+    document.querySelectorAll('#findingFilters select').forEach(select => select.addEventListener('change', applyFindingFilters));
+
+    async function setFindingStatus(findingId, status, button) {
+        const body = new URLSearchParams({status});
+        const response = await fetch(`/api/findings/${findingId}/status`, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body});
+        if (!response.ok) return;
+        const card = button.closest('.finding-card');
+        card.dataset.status = status;
+        card.querySelector('.status-pill').textContent = status;
+        applyFindingFilters();
     }
 
     // Graph visualization

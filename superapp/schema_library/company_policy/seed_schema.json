@@ -1,0 +1,9 @@
+{
+  "items": [
+    {"category": "privacy", "topic": "Data Retention", "description": "Retention periods, deletion rules, and legal holds.", "importance": "high"},
+    {"category": "security", "topic": "Access Control", "description": "Identity, least privilege, and access review requirements.", "importance": "critical"},
+    {"category": "security", "topic": "Incident Response", "description": "Detection, escalation, notification, and remediation duties.", "importance": "critical"},
+    {"category": "governance", "topic": "Compliance", "description": "Applicable standards, audits, and control ownership.", "importance": "high"},
+    {"category": "privacy", "topic": "Confidentiality", "description": "Confidential information handling and disclosure restrictions.", "importance": "high"}
+  ]
+}

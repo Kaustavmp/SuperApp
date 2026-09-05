@@ -44,7 +44,13 @@ class OllamaProvider(LLMProvider):
         }
         if response_format:
             kwargs["format"] = response_format
-        return await self._client.chat(**kwargs)
+        response = await self._client.chat(**kwargs)
+        usage = getattr(response, "get", lambda *_: {}) ("prompt_eval_count", 0)
+        response["usage"] = {
+            "prompt_tokens": response.get("prompt_eval_count", usage or 0),
+            "completion_tokens": response.get("eval_count", 0),
+        }
+        return response
 
     async def embed(self, text: str | list[str], *, model: str | None = None) -> list[float] | list[list[float]]:
         if self._client is None:
@@ -81,7 +87,8 @@ class OpenAIProvider(LLMProvider):
             request["response_format"] = {"type": "json_object"}
         response = await self._client.chat.completions.create(**request)
         content = response.choices[0].message.content or "{}"
-        return {"message": {"content": content}}
+        usage = response.usage.model_dump() if response.usage else {}
+        return {"message": {"content": content}, "usage": usage}
 
     async def embed(self, text: str | list[str], *, model: str | None = None) -> list[float] | list[list[float]]:
         if self._client is None:
@@ -124,7 +131,14 @@ class AnthropicProvider(LLMProvider):
         for block in response.content:
             if getattr(block, "type", None) == "text":
                 content += block.text
-        return {"message": {"content": content or "{}"}}
+        usage = getattr(response, "usage", None)
+        return {
+            "message": {"content": content or "{}"},
+            "usage": {
+                "input_tokens": getattr(usage, "input_tokens", 0),
+                "output_tokens": getattr(usage, "output_tokens", 0),
+            },
+        }
 
     async def embed(self, text: str | list[str], *, model: str | None = None) -> list[float] | list[list[float]]:
         raise NotImplementedError("Anthropic embeddings are not implemented in this MVP adapter.")

@@ -1,6 +1,7 @@
 import json
 import ollama
 import uuid
+import asyncio
 from typing import List, Dict
 
 from superapp.config import settings
@@ -15,11 +16,14 @@ class ClaimExtractor:
         # Build lookup dict for document filenames
         doc_lookup: Dict[str, str] = {doc.id: doc.filename for doc in documents}
         
-        all_claims = []
-        for chunk in chunks:
-            source_filename = doc_lookup.get(chunk.document_id, "unknown")
-            claims = await self._extract_from_chunk(chunk, source_filename)
-            all_claims.extend(claims)
+        semaphore = asyncio.Semaphore(max(1, settings.max_concurrent_llm_calls))
+
+        async def extract(chunk: Chunk) -> List[AtomicClaim]:
+            async with semaphore:
+                return await self._extract_from_chunk(chunk, doc_lookup.get(chunk.document_id, "unknown"))
+
+        batches = await asyncio.gather(*(extract(chunk) for chunk in chunks))
+        all_claims = [claim for batch in batches for claim in batch]
             
         return all_claims
         
@@ -30,7 +34,7 @@ class ClaimExtractor:
         ]
         
         response = await self.client.chat(
-            model=settings.ollama_reasoning_model,
+            model=settings.get_model_for_stage("claim_extraction"),
             messages=messages,
             format="json"
         )
